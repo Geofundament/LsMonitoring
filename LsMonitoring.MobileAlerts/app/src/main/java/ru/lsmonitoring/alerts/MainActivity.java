@@ -42,7 +42,7 @@ public final class MainActivity extends Activity {
     static final String PREF_LAST_MESSAGE = "last_message";
     static final String PREF_LAST_MESSAGE_AT = "last_message_at";
     private static final String CHANNEL_ALARMS = "alarms";
-    private static final String LATEST_RELEASE_URL = "https://api.github.com/repos/Gorjian1/LsMonitoring/releases/latest";
+    private static final String LATEST_RELEASE_URL = "https://api.github.com/repos/Geofundament/LsMonitoring/releases/latest";
 
     private EditText serverUrlBox;
     private EditText clientTokenBox;

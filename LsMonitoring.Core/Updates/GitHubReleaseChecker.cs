@@ -14,8 +14,8 @@ public sealed record ReleaseUpdateResult
 
 public static class GitHubReleaseChecker
 {
-    public const string LatestReleaseUrl = "https://api.github.com/repos/Gorjian1/LsMonitoring/releases/latest";
-    public const string RepositoryReleasesUrl = "https://github.com/Gorjian1/LsMonitoring/releases";
+    public const string LatestReleaseUrl = "https://api.github.com/repos/Geofundament/LsMonitoring/releases/latest";
+    public const string RepositoryReleasesUrl = "https://github.com/Geofundament/LsMonitoring/releases";
 
     public static async Task<ReleaseUpdateResult> CheckAsync(
         string currentVersion,

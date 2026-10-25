@@ -9,7 +9,7 @@ namespace LsMonitoring.Avalonia;
 /// </summary>
 public sealed class UpdateService
 {
-    private const string RepoUrl = "https://github.com/Gorjian1/LsMonitoring";
+    private const string RepoUrl = "https://github.com/Geofundament/LsMonitoring";
 
     private readonly UpdateManager _mgr;
     private UpdateInfo? _pending;

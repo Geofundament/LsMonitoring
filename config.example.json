@@ -48,7 +48,7 @@
     "server_url": "",
     "app_token_b64": "",
     "client_token_b64": "",
-    "app_download_url": "https://github.com/Gorjian1/LsMonitoring/releases/latest/download/ls-alerts-latest.apk",
+    "app_download_url": "https://github.com/Geofundament/LsMonitoring/releases/latest/download/ls-alerts-latest.apk",
     "auto_start_temporary_tunnel": true,
     "local_server_url": "http://localhost:8080",
     "priority": 5

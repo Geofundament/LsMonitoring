@@ -234,7 +234,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force artifacts/previous | Out-Null
           vpk download github `
-            --repoUrl https://github.com/Gorjian1/LsMonitoring `
+            --repoUrl https://github.com/Geofundament/LsMonitoring `
             --token ${{ github.token }} `
             --channel win `
             --outputDir artifacts/previous
@@ -390,7 +390,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           vpk upload github \
-            --repoUrl https://github.com/Gorjian1/LsMonitoring \
+            --repoUrl https://github.com/Geofundament/LsMonitoring \
             --token ${{ github.token }} \
             --channel win \
             --tag ${{ github.ref_name }} \

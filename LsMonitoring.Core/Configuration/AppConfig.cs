@@ -431,7 +431,7 @@ public sealed class SmsConfig
 
 public sealed class PushConfig
 {
-    public const string DefaultAppDownloadUrl = "https://github.com/Gorjian1/LsMonitoring/releases/latest/download/ls-alerts-latest.apk";
+    public const string DefaultAppDownloadUrl = "https://github.com/Geofundament/LsMonitoring/releases/latest/download/ls-alerts-latest.apk";
     public const string DefaultLocalServerUrl = "http://localhost:8080";
 
     [JsonPropertyName("enabled")]

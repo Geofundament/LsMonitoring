@@ -20,7 +20,7 @@ public sealed class GitHubReleaseCheckerTests
             """
             {
               "tag_name": "v0.3.0",
-              "html_url": "https://github.com/Gorjian1/LsMonitoring/releases/tag/v0.3.0"
+              "html_url": "https://github.com/Geofundament/LsMonitoring/releases/tag/v0.3.0"
             }
             """);
         using var client = new HttpClient(handler);
@@ -33,7 +33,7 @@ public sealed class GitHubReleaseCheckerTests
         Assert.Null(result.Error);
         Assert.True(result.IsUpdateAvailable);
         Assert.Equal("0.3.0", result.LatestVersion);
-        Assert.Equal("https://github.com/Gorjian1/LsMonitoring/releases/tag/v0.3.0", result.ReleaseUrl);
+        Assert.Equal("https://github.com/Geofundament/LsMonitoring/releases/tag/v0.3.0", result.ReleaseUrl);
     }
 
     private sealed class ReleaseHandler(string body) : HttpMessageHandler
