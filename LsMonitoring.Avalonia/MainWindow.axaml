@@ -7,7 +7,7 @@
         x:Class="LsMonitoring.Avalonia.MainWindow"
         Width="1280" Height="800"
         MinWidth="1180" MinHeight="620"
-        Title="LS-G6 Мониторинг"
+        Title="ГФ 402 — Мониторинг наклона"
         Background="{StaticResource BrushAppBackground}"
         WindowState="Maximized">
 
@@ -42,7 +42,7 @@
                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <StackPanel Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="LS Monitoring" FontSize="15" FontWeight="SemiBold"
+                        <TextBlock Text="ГФ 402" FontSize="15" FontWeight="SemiBold"
                                    Foreground="{StaticResource BrushText}"/>
                     </StackPanel>
                 </Grid>
