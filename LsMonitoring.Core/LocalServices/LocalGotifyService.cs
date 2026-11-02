@@ -339,6 +339,7 @@ pluginsdir: plugins
 
         var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException("gotify-server.exe не запустился.");
+        ChildProcessJob.Add(process);
 
         // Drain the streams so the process doesn't block on a full pipe buffer.
         _ = Task.Run(async () =>

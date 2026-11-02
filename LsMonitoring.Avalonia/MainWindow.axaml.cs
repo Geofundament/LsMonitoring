@@ -1,10 +1,12 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Text.Json;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using Geofundament.Distribution;
 using LsMonitoring.Core.Configuration;
 using LsMonitoring.Core.IO;
 using LsMonitoring.Core.Models;
@@ -20,6 +22,8 @@ namespace LsMonitoring.Avalonia;
 public partial class MainWindow : Window
 {
     private const int MaxDeviationHistoryItems = 500;
+    // Renews the 14-day lease and picks up updates/revocation on a station that runs for weeks.
+    private const int LicenseRecheckSeconds = 6 * 60 * 60;
     private static readonly JsonSerializerOptions DeviationHistoryJsonOptions = new()
     {
         WriteIndented = true
@@ -35,7 +39,10 @@ public partial class MainWindow : Window
     private readonly AlertStateTracker _alertState = new();
     private readonly LocalhostRunTunnelService _quickTunnelService = LocalhostRunTunnelService.CreateDefault();
     private readonly LocalGotifyService _localGotifyService = LocalGotifyService.CreateDefault();
-    private readonly UpdateService _updateService = new();
+    // "LsMonitoring" is the installer's AppName in GfDistribution/release.ps1: it names the key folder
+    // %LOCALAPPDATA%\Геофундамент\LsMonitoring. Never change it, or installed copies lose their key.
+    private readonly GfLicense _license = new("ls", "LsMonitoring", DiagnosticsDialog.CurrentAppVersion());
+    private readonly string _baseTitle;
     private readonly CancellationTokenSource _shutdownCts = new();
     private readonly string _configPath;
     private readonly string _deviationHistoryPath;
@@ -67,17 +74,22 @@ public partial class MainWindow : Window
     private DispatcherTimer? _saveHistoryTimer;
     private DispatcherTimer? _saveConfigTimer;
     private Task? _pushTunnelTask;
-    private Task? _updateTask;
+    private Task? _licenseTask;
     private Task? _shutdownTask;
     private bool _shutdownComplete;
     private bool _isShuttingDown;
+    private bool _alertsAllowed;
 
     public MainWindow()
     {
         InitializeComponent();
+        _baseTitle = Title ?? "";
         _configPath = AppConfig.ResolveDefaultPath();
         _deviationHistoryPath = ResolveDeviationHistoryPath();
         _config = AppConfig.Load(_configPath);
+        _license.LoadSaved();
+        _alertsAllowed = AlertsAllowed(_license);
+        _license.Changed += () => Dispatcher.UIThread.Post(OnLicenseChanged);
 
         NodeList.ItemsSource = _nodes;
         RowsList.ItemsSource = _rows;
@@ -85,6 +97,7 @@ public partial class MainWindow : Window
 
         LoadDeviationHistory();
         LoadConfigToUi();
+        ApplyLicenseToUi();
         ReconfigureAlertServices();
         WireEvents();
         LoadNodesFromConfig();
@@ -92,8 +105,11 @@ public partial class MainWindow : Window
         UpdatePollingButtons();
         RefreshCurrentNode();
         StartConfiguredPushTunnelInBackground();
-        CheckForUpdatesInBackground();
+        CheckLicenseInBackground();
         StartStartupDiscoveryOnce();
+#if !DEBUG
+        _ = Task.Run(LegacyInstall.RemoveVelopackCopy);
+#endif
     }
 
     protected override async void OnClosing(WindowClosingEventArgs e)
@@ -152,19 +168,26 @@ public partial class MainWindow : Window
             _config.Save(_configPath);
         }
 
-        await WaitForBackgroundServicesToStopAsync();
-        await _telegramCompanion.DisposeAsync();
-        await StopPollingAsync();
-        _heartbeat?.Stop();
-        _quickTunnelService.Dispose();
-        _localGotifyService.Dispose();
-        _alertHttpClient.Dispose();
-        _shutdownCts.Dispose();
+        try
+        {
+            await WaitForBackgroundServicesToStopAsync();
+            await _telegramCompanion.DisposeAsync();
+            await StopPollingAsync();
+        }
+        finally
+        {
+            // Helpers must go even if something above failed (the job object also kills them on exit).
+            _heartbeat?.Stop();
+            _quickTunnelService.Dispose();
+            _localGotifyService.Dispose();
+            _alertHttpClient.Dispose();
+            _shutdownCts.Dispose();
+        }
     }
 
     private async Task WaitForBackgroundServicesToStopAsync()
     {
-        var tasks = new[] { _pushTunnelTask, _updateTask }
+        var tasks = new[] { _pushTunnelTask, _licenseTask }
             .Where(task => task is not null && !task.IsCompleted)
             .Cast<Task>()
             .ToArray();
@@ -193,7 +216,8 @@ public partial class MainWindow : Window
         PickPlotLimitButton.Click += (_, _) => TogglePlotLimitPicker();
         ClearPlotLimitButton.Click += (_, _) => SetPlotCutoff(null);
         ClearDeviationHistoryButton.Click += (_, _) => ClearDeviationHistory();
-        UpdateBannerButton.Click += async (_, _) => await ApplyUpdateAndRestartAsync();
+        UpdateBannerButton.Click += async (_, _) => await InstallUpdateAsync();
+        LicenseBannerButton.Click += async (_, _) => await ShowMessagesDialogAsync();
         PlotA.CutoffTimePicked += OnPlotCutoffPicked;
         PlotB.CutoffTimePicked += OnPlotCutoffPicked;
         TimeWindowBox.SelectionChanged += (_, _) =>
@@ -218,6 +242,11 @@ public partial class MainWindow : Window
         _heartbeat.Tick += (_, _) =>
         {
             _heartbeatTick++;
+            if (_heartbeatTick % LicenseRecheckSeconds == 0)
+            {
+                CheckLicenseInBackground();
+            }
+
             if (_heartbeatTick % 5 == 0)
             {
                 // Pull any chats that bound to the bot (via /start <code>) from the companion.
@@ -414,7 +443,7 @@ public partial class MainWindow : Window
 
     private async Task ShowMessagesDialogAsync()
     {
-        var dialog = new MessagesDialog(_telegramCompanion, _quickTunnelService, _localGotifyService);
+        var dialog = new MessagesDialog(_telegramCompanion, _quickTunnelService, _localGotifyService, _license);
         dialog.LoadConfig(_config);
         dialog.ConfigChanged += OnMessagesDialogConfigChanged;
         var saved = false;
@@ -435,6 +464,9 @@ public partial class MainWindow : Window
             {
                 StartConfiguredPushTunnelInBackground();
             }
+
+            // The dialog may have started Gotify for a test and then been cancelled or saved with Push off.
+            StopPushHelpersIfUnused();
         }
     }
 
@@ -447,7 +479,7 @@ public partial class MainWindow : Window
     private async Task ShowDiagnosticsDialogAsync()
     {
         var dialog = new DiagnosticsDialog();
-        dialog.Load(BuildDiagnosticsSnapshot());
+        dialog.Load(BuildDiagnosticsSnapshot(), _license);
         await dialog.ShowDialog(this);
     }
 
@@ -479,12 +511,6 @@ public partial class MainWindow : Window
                     _emailAlertService is not null && _config.Email.HasDeliverySettings,
                     false,
                     _emailAlertService?.LastError),
-                new ChannelDiagnostics(
-                    "SMS",
-                    _config.Sms.Enabled,
-                    _smsAlertService is not null && _config.Sms.HasDeliverySettings,
-                    false,
-                    _smsAlertService?.LastError),
                 new ChannelDiagnostics(
                     "Push",
                     _config.Push.Enabled,
@@ -523,7 +549,7 @@ public partial class MainWindow : Window
         }
 
         var botToken = _config.Telegram.EffectiveBotToken;
-        if (_config.Telegram.Enabled && !string.IsNullOrWhiteSpace(botToken))
+        if (_alertsAllowed && _config.Telegram.Enabled && !string.IsNullOrWhiteSpace(botToken))
         {
             await _telegramCompanion.EnsureConfiguredAsync(
                 botToken,
@@ -539,7 +565,7 @@ public partial class MainWindow : Window
 
     private async Task SyncTelegramChatIdsAsync()
     {
-        if (_isShuttingDown || !_config.Telegram.Enabled)
+        if (_isShuttingDown || !_alertsAllowed || !_config.Telegram.Enabled)
         {
             return;
         }
@@ -564,22 +590,30 @@ public partial class MainWindow : Window
     private void ReconfigureEmailAlerts()
     {
         // Email sends directly over SMTP now (no relay), so it no longer needs the shared HttpClient.
-        _emailAlertService = _config.Email.Enabled ? new EmailAlertService(_config.Email) : null;
+        _emailAlertService = _alertsAllowed && _config.Email.Enabled
+            ? new EmailAlertService(_config.Email, previous: _emailAlertService)
+            : null;
     }
 
     private void ReconfigureSmsAlerts()
     {
-        _smsAlertService = _config.Sms.Enabled ? new SmsAlertService(_config.Sms, _alertHttpClient) : null;
+        // ponytail: SMS is hidden in the UI while the SIM/provider issues are unresolved, so it must not send
+        // either (an operator could not switch it off). Bring this back together with the SMS tab:
+        // _smsAlertService = _alertsAllowed && _config.Sms.Enabled ? new SmsAlertService(_config.Sms, _alertHttpClient) : null;
+        _smsAlertService = null;
     }
 
     private void ReconfigureGotifyAlerts()
     {
-        _gotifyAlertService = _config.Push.Enabled ? new GotifyAlertService(_config.Push, _alertHttpClient) : null;
+        _gotifyAlertService = _alertsAllowed && _config.Push.Enabled
+            ? new GotifyAlertService(_config.Push, _alertHttpClient, _gotifyAlertService)
+            : null;
     }
 
     private void StartConfiguredPushTunnelInBackground()
     {
-        if (_isShuttingDown || !_config.Push.ShouldAutoStartTemporaryTunnel || _pushTunnelStartInProgress)
+        if (_isShuttingDown || !_alertsAllowed || !_config.Push.ShouldAutoStartTemporaryTunnel ||
+            _pushTunnelStartInProgress)
         {
             return;
         }
@@ -587,31 +621,84 @@ public partial class MainWindow : Window
         _pushTunnelTask = EnsureConfiguredPushTunnelAsync(_shutdownCts.Token);
     }
 
-    private void CheckForUpdatesInBackground()
+    private void StopPushHelpersIfUnused()
+    {
+        if (_isShuttingDown || _pushTunnelStartInProgress || (_alertsAllowed && _config.Push.Enabled))
+        {
+            return;
+        }
+
+        _quickTunnelService.Stop();
+        _localGotifyService.Stop();
+    }
+
+    // Alerts are the licensed part: without a key the app still monitors (the gateway itself shows the same
+    // data) but sends nothing and starts no helpers. Debug builds always allow alerts for development.
+    internal static bool AlertsAllowed(GfLicense license)
+    {
+#if DEBUG
+        return true;
+#else
+        return license.State.IsFull;
+#endif
+    }
+
+    private void CheckLicenseInBackground()
+    {
+        if (_isShuttingDown || _licenseTask is { IsCompleted: false })
+        {
+            return;
+        }
+
+        _licenseTask = CheckLicenseAsync(_shutdownCts.Token);
+    }
+
+    private async Task CheckLicenseAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            // No answer keeps the current state; the saved lease covers 14 days offline.
+            await _license.CheckAsync(cancellationToken);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException)
+        {
+            // Lease file not writable or shutdown in progress: retried on the next periodic check.
+        }
+    }
+
+    private void OnLicenseChanged()
     {
         if (_isShuttingDown)
         {
             return;
         }
 
-        _updateTask = CheckForUpdatesAsync(_shutdownCts.Token);
-    }
-
-    private async Task CheckForUpdatesAsync(CancellationToken cancellationToken)
-    {
-        // Only works when running as a Velopack-managed install (not portable).
-        var ready = await _updateService.CheckAndDownloadAsync(ct: cancellationToken);
-        if (!ready || cancellationToken.IsCancellationRequested || _isShuttingDown)
+        ApplyLicenseToUi();
+        var allowed = AlertsAllowed(_license);
+        if (allowed == _alertsAllowed)
         {
             return;
         }
 
-        await Dispatcher.UIThread.InvokeAsync(() =>
+        _alertsAllowed = allowed;
+        ReconfigureAlertServices();
+        StartConfiguredPushTunnelInBackground();
+        StopPushHelpersIfUnused();
+    }
+
+    private void ApplyLicenseToUi()
+    {
+        var state = _license.State;
+        Title = state.IsFull && state.Holder.Length > 0 ? $"{_baseTitle} — {state.Holder}" : _baseTitle;
+        LicenseBanner.IsVisible = !AlertsAllowed(_license);
+
+        if (_license.Update is { } update && UpdateBannerButton.IsEnabled)
         {
-            UpdateBannerText.Text =
-                $"Доступно обновление {_updateService.PendingVersion} — скачано и готово к установке";
+            UpdateBannerText.Text = string.IsNullOrWhiteSpace(update.Notes)
+                ? $"Доступна версия {update.Version}"
+                : $"Доступна версия {update.Version} — {update.Notes}";
             UpdateBanner.IsVisible = true;
-        });
+        }
     }
 
     private async Task EnsureConfiguredPushTunnelAsync(CancellationToken cancellationToken)
@@ -673,14 +760,6 @@ public partial class MainWindow : Window
 
             cancellationToken.ThrowIfCancellationRequested();
 
-            // First-run convenience: once we have a working stack, enable the channel so the user can
-            // immediately see push notifications without flipping the switch manually.
-            if (!_config.Push.Enabled)
-            {
-                _config.Push.Enabled = true;
-                configChanged = true;
-            }
-
             if (configChanged)
             {
                 _config.Save(_configPath);
@@ -707,10 +786,24 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task ApplyUpdateAndRestartAsync()
+    private async Task InstallUpdateAsync()
     {
-        await CleanupAsync();
-        _updateService.ApplyAndRestart();
+        UpdateBannerButton.IsEnabled = false;
+        UpdateBannerText.Text = $"Скачивание версии {_license.Update?.Version}…";
+        try
+        {
+            await _license.InstallUpdateAsync(_shutdownCts.Token);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidOperationException
+                                       or Win32Exception or OperationCanceledException)
+        {
+            UpdateBannerText.Text = $"Не удалось скачать обновление: {ex.Message}";
+            UpdateBannerButton.IsEnabled = true;
+            return;
+        }
+
+        // The installer now runs silently: it closes what is left, replaces the files and starts the app again.
+        Close();
     }
 
     private async Task DiscoverNodesAsync()
@@ -933,7 +1026,8 @@ public partial class MainWindow : Window
 
     private IEnumerable<IAlertChannel> EnabledAlertChannels()
     {
-        if (_config.Telegram.Enabled && !string.IsNullOrWhiteSpace(_config.Telegram.EffectiveBotToken))
+        if (_alertsAllowed && _config.Telegram.Enabled &&
+            !string.IsNullOrWhiteSpace(_config.Telegram.EffectiveBotToken))
         {
             yield return _telegramCompanion;
         }

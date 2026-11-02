@@ -49,6 +49,31 @@ public class GotifyAlertServiceTests
     }
 
     [Fact]
+    public async Task Replacement_KeepsOpenAlarmSoResolvedEventRetainsItsStartTime()
+    {
+        var handler = new CapturingHandler();
+        using var http = new HttpClient(handler);
+        var config = new PushConfig
+        {
+            Enabled = true,
+            ServerUrl = "https://push.example.org/",
+            AppToken = "app-token"
+        };
+        var start = new DateTime(2026, 5, 25, 12, 0, 0, DateTimeKind.Local);
+        var before = new GotifyAlertService(config, http);
+        await before.UpdateAlarmAsync(6989, "A", true, -12, start);
+
+        var after = new GotifyAlertService(config, http, before);
+        await after.UpdateAlarmAsync(6989, "A", false, -1, start.AddSeconds(95));
+
+        Assert.Equal(2, handler.RequestBodies.Count);
+        using var payload = JsonDocument.Parse(handler.RequestBodies[1]);
+        var alarm = payload.RootElement.GetProperty("extras").GetProperty(GotifyAlertExtras.AlarmKey);
+        Assert.Equal("resolved", alarm.GetProperty("event").GetString());
+        Assert.Equal(95, alarm.GetProperty("durationSeconds").GetInt32());
+    }
+
+    [Fact]
     public async Task UpdateAlarmAsync_SerializesConcurrentAxesAndSendsBothActiveEvents()
     {
         var handler = new CapturingHandler { Delay = TimeSpan.FromMilliseconds(20) };

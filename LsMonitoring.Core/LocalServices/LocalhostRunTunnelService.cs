@@ -217,6 +217,7 @@ public sealed class LocalhostRunTunnelService : IDisposable
 
         _sshProcess = Process.Start(startInfo)
             ?? throw new InvalidOperationException("ssh.exe не запустился.");
+        ChildProcessJob.Add(_sshProcess);
 
         try
         {

@@ -9,7 +9,7 @@ The active implementation is the C#/.NET 9 + Avalonia app in the root solution.
 
 - Prefer the existing C# solution and patterns in `LsMonitoring.Core/`, `LsMonitoring.Avalonia/`, and `LsMonitoring.Core.Tests/` for new behavior.
 - Keep gateway credentials, private sensor logs, and exported customer data out of Git.
-- Do not commit local runtime output: `config.json`, `data/`, `logs/`, `dist/`, `.dotnet-cli-home/`, test results, or cache directories. `build/installer/` is source; other `build/` output is not.
+- Do not commit local runtime output: `config.json`, `data/`, `logs/`, `dist/`, `.dotnet-cli-home/`, test results, or cache directories. `build/` is local output only.
 - Treat `.claude/`, `.codex/`, and other AI-tool state directories as local tool state, not project source.
 - Make focused changes in the current .NET solution.
 

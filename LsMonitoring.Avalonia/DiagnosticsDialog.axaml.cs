@@ -1,9 +1,8 @@
-using System.Diagnostics;
 using System.Net;
 using System.Reflection;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using LsMonitoring.Core.Updates;
+using Geofundament.Distribution;
 
 namespace LsMonitoring.Avalonia;
 
@@ -31,18 +30,19 @@ public sealed class DiagnosticsSnapshot
 
 public partial class DiagnosticsDialog : Window
 {
-    private string _releaseUrl = GitHubReleaseChecker.RepositoryReleasesUrl;
+    private GfLicense? _license;
 
     public DiagnosticsDialog()
     {
         InitializeComponent();
         CheckUpdateButton.Click += OnCheckUpdateClick;
-        OpenReleaseButton.Click += (_, _) => OpenUrl(_releaseUrl);
         CloseButton.Click += OnCloseClick;
     }
 
-    public void Load(DiagnosticsSnapshot snapshot)
+    public void Load(DiagnosticsSnapshot snapshot, GfLicense license)
     {
+        _license = license;
+        UpdateStatusText.Text = DescribeLicense(license);
         AppVersionText.Text = CurrentAppVersion();
         ConfigPathText.Text = snapshot.ConfigPath;
         HistoryPathText.Text = snapshot.DeviationHistoryPath;
@@ -57,7 +57,6 @@ public partial class DiagnosticsDialog : Window
 
         TelegramChannelText.Text = FormatChannel(snapshot.Channels, "Telegram");
         EmailChannelText.Text = FormatChannel(snapshot.Channels, "Почта");
-        SmsChannelText.Text = FormatChannel(snapshot.Channels, "SMS");
         PushChannelText.Text = FormatChannel(snapshot.Channels, "Push");
         ChannelErrorsText.Text = FormatChannelErrors(snapshot.Channels);
 
@@ -76,39 +75,42 @@ public partial class DiagnosticsDialog : Window
 
     private async void OnCheckUpdateClick(object? sender, RoutedEventArgs e)
     {
-        CheckUpdateButton.IsEnabled = false;
-        OpenReleaseButton.IsEnabled = false;
-        UpdateStatusText.Text = "Проверка GitHub Releases...";
+        if (_license is null)
+        {
+            return;
+        }
 
+        CheckUpdateButton.IsEnabled = false;
+        UpdateStatusText.Text = "Проверка у сервиса выдачи...";
         try
         {
-            var result = await GitHubReleaseChecker.CheckAsync(CurrentAppVersion());
-            if (!string.IsNullOrWhiteSpace(result.Error))
-            {
-                UpdateStatusText.Text = result.Error;
-                return;
-            }
-
-            _releaseUrl = string.IsNullOrWhiteSpace(result.ReleaseUrl)
-                ? GitHubReleaseChecker.RepositoryReleasesUrl
-                : result.ReleaseUrl;
-            OpenReleaseButton.IsEnabled = true;
-
-            if (result.IsUpdateAvailable)
-            {
-                UpdateStatusText.Text = $"Доступна версия {result.LatestVersion}. Текущая версия: {result.CurrentVersion}.";
-                OpenReleaseButton.Content = "Открыть релиз";
-            }
-            else
-            {
-                UpdateStatusText.Text = $"Версия актуальна: {result.CurrentVersion}.";
-                OpenReleaseButton.Content = "Открыть релизы";
-            }
+            var answered = await _license.CheckAsync();
+            UpdateStatusText.Text = answered
+                ? DescribeLicense(_license)
+                : $"Сервис выдачи не ответил. {DescribeLicense(_license)}";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            UpdateStatusText.Text = $"Не удалось сохранить разрешение: {ex.Message}";
         }
         finally
         {
             CheckUpdateButton.IsEnabled = true;
         }
+    }
+
+    private static string DescribeLicense(GfLicense license)
+    {
+        var state = license.State;
+        var licence = state.IsFull
+            ? $"Лицензия: {state.Holder}" + (state.ExpiresAt is { } until ? $", до {until.LocalDateTime:dd.MM.yyyy}" : ", бессрочно")
+            : string.IsNullOrWhiteSpace(state.Message)
+                ? "Без ключа: мониторинг работает, оповещения выключены."
+                : $"Без ключа: {state.Message}";
+        var update = license.Update is { } available
+            ? $"Доступна версия {available.Version} — кнопка «Установить» в полосе над окном."
+            : $"Версия {CurrentAppVersion()}.";
+        return $"{licence}{Environment.NewLine}{update}";
     }
 
     private void OnCloseClick(object? sender, RoutedEventArgs e)
@@ -221,7 +223,7 @@ public partial class DiagnosticsDialog : Window
                bytes is [169, 254, ..];
     }
 
-    private static string CurrentAppVersion()
+    internal static string CurrentAppVersion()
     {
         var assembly = typeof(DiagnosticsDialog).Assembly;
         var informational = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
@@ -231,20 +233,5 @@ public partial class DiagnosticsDialog : Window
         }
 
         return assembly.GetName().Version?.ToString(3) ?? "unknown";
-    }
-
-    private static void OpenUrl(string url)
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo(url)
-            {
-                UseShellExecute = true
-            });
-        }
-        catch
-        {
-            // Opening a browser is optional diagnostics behavior.
-        }
     }
 }

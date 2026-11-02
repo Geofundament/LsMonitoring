@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
+using Geofundament.Distribution;
 using LsMonitoring.Core.Alarms;
 using LsMonitoring.Core.Configuration;
 using LsMonitoring.Core.LocalServices;
@@ -22,6 +23,7 @@ public partial class MessagesDialog : Window
     private readonly LocalhostRunTunnelService _quickTunnelService;
     private readonly LocalGotifyService _localGotifyService;
     private readonly TelegramCompanionService? _companion;
+    private readonly GfLicense? _license;
     // Shared by the channel "test" buttons so repeated clicks don't leak an HttpClient each time.
     private readonly HttpClient _testHttpClient = new();
 
@@ -30,20 +32,24 @@ public partial class MessagesDialog : Window
     public event Action? ConfigChanged;
 
     // Parameterless ctor required by the Avalonia runtime XAML loader / previewer.
-    public MessagesDialog() : this(null, LocalhostRunTunnelService.CreateDefault(), LocalGotifyService.CreateDefault())
+    public MessagesDialog() : this(null, LocalhostRunTunnelService.CreateDefault(), LocalGotifyService.CreateDefault(), null)
     {
     }
 
     public MessagesDialog(
         TelegramCompanionService? companion,
         LocalhostRunTunnelService quickTunnelService,
-        LocalGotifyService localGotifyService)
+        LocalGotifyService localGotifyService,
+        GfLicense? license)
     {
         _companion = companion;
+        _license = license;
         _quickTunnelService = quickTunnelService;
         _localGotifyService = localGotifyService;
         InitializeComponent();
         SaveButton.Click += OnSaveClick;
+        ActivateKeyButton.Click += OnActivateKeyClick;
+        EmailFromBox.TextChanged += (_, _) => RefreshSmtpHostHint();
         CancelButton.Click += OnCancelClick;
         BotLinkButton.Click += OnBotLinkClick;
         TestTelegramButton.Click += OnTestTelegramClick;
@@ -68,6 +74,7 @@ public partial class MessagesDialog : Window
     public void LoadConfig(AppConfig config)
     {
         _config = config;
+        ApplyLicenseState();
         TelegramLinkCodeBox.Text = config.Telegram.EffectiveLinkCode;
         SetQrCode(TelegramBotQrImage, BuildTelegramBotUrl(config.Telegram.EffectiveLinkCode));
         BotLinkButton.Content = $"@{TelegramSecrets.DefaultBotUsername}";
@@ -100,7 +107,7 @@ public partial class MessagesDialog : Window
         PushServerUrlBox.Text = config.Push.ServerUrl;
         PushAppTokenBox.Text = config.Push.AppToken;
         PushClientTokenBox.Text = config.Push.ClientToken;
-        PushAppDownloadUrlBox.Text = config.Push.EffectiveAppDownloadUrl;
+        PushAppDownloadUrlBox.Text = config.Push.AppDownloadUrl;
         PushAutoTunnelBox.IsChecked = config.Push.AutoStartTemporaryTunnel;
         PushLocalServerUrlBox.Text = config.Push.EffectiveLocalServerUrl;
         PushPriorityBox.Text = config.Push.Priority.ToString();
@@ -149,6 +156,50 @@ public partial class MessagesDialog : Window
     private void OnCancelClick(object? sender, RoutedEventArgs e)
     {
         Close(false);
+    }
+
+    private void ApplyLicenseState()
+    {
+        var allowed = _license is null || MainWindow.AlertsAllowed(_license);
+        LicensePanel.IsVisible = !allowed;
+        ChannelTabs.IsEnabled = allowed;
+    }
+
+    private async void OnActivateKeyClick(object? sender, RoutedEventArgs e)
+    {
+        if (_license is null)
+        {
+            return;
+        }
+
+        ActivateKeyButton.IsEnabled = false;
+        LicenseStatusText.Text = "Проверка ключа...";
+        try
+        {
+            _license.SetKey(LicenseKeyBox.Text ?? "");
+            var answered = await _license.CheckAsync();
+            LicenseStatusText.Text = !answered ? "Сервис выдачи не ответил. Проверьте интернет и повторите."
+                : _license.State.IsFull ? ""
+                : string.IsNullOrWhiteSpace(_license.State.Message) ? "Ключ не подошёл."
+                : _license.State.Message;
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
+        {
+            LicenseStatusText.Text = ex.Message;
+        }
+        finally
+        {
+            ActivateKeyButton.IsEnabled = true;
+        }
+
+        // MainWindow follows the same license through its Changed event and enables the channels itself.
+        ApplyLicenseState();
+    }
+
+    private void RefreshSmtpHostHint()
+    {
+        var host = EmailSmtpProfile.ResolveHost((EmailFromBox.Text ?? "").Trim());
+        EmailSmtpHostBox.PlaceholderText = host.Length > 0 ? $"авто: {host}" : "авто по адресу отправителя";
     }
 
     private void OnBotLinkClick(object? sender, RoutedEventArgs e)

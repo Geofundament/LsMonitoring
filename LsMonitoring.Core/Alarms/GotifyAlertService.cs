@@ -30,17 +30,28 @@ public sealed class GotifyAlertService : IUpdatableAlertChannel
     public string? LastError { get; private set; }
     public string ChannelName => "Push";
 
-    public GotifyAlertService(PushConfig config, HttpClient? httpClient = null)
+    /// <param name="previous">
+    /// The instance this one replaces after a settings change: its open alarms carry over, so the phone gets
+    /// updates and "норма" for them instead of a duplicate "тревога".
+    /// </param>
+    public GotifyAlertService(PushConfig config, HttpClient? httpClient = null, GotifyAlertService? previous = null)
     {
         _config = config;
         _httpClient = httpClient ?? new HttpClient();
+        if (previous is not null)
+        {
+            foreach (var (key, alarm) in previous._activeAlarms)
+            {
+                _activeAlarms[key] = alarm;
+            }
+        }
     }
 
     public async Task<bool> SendTestMessageAsync()
     {
         return await SendMessageAsync(
-            "LS Monitoring",
-            "Тестовый push от LS Monitoring. Если уведомление пришло, Gotify подключён.",
+            "ГФ 402",
+            "Тестовый push от ГФ 402. Если уведомление пришло, Gotify подключён.",
             _config.Priority,
             BuildTestExtras());
     }

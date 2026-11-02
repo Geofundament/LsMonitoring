@@ -76,9 +76,35 @@
                        Foreground="{StaticResource BrushText}"/>
             <TextBlock Classes="dialog-subtitle"
                        Text="Выберите канал, укажите получателей и отправьте тест."/>
+            <Border x:Name="LicensePanel"
+                    IsVisible="False"
+                    Margin="0,8,0,0"
+                    Background="{StaticResource BrushWarningTint}"
+                    BorderBrush="#FCD34D"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="12">
+                <StackPanel Spacing="8">
+                    <TextBlock Classes="card-text"
+                               Foreground="{StaticResource BrushWarning}"
+                               Text="Оповещения включаются ключом из личной ссылки Геофундамента. Мониторинг работает и без ключа."/>
+                    <Grid ColumnDefinitions="Auto,240,Auto,*" ColumnSpacing="8">
+                        <TextBlock Classes="field-label" Text="Ключ:"/>
+                        <TextBox Grid.Column="1" x:Name="LicenseKeyBox"
+                                 PlaceholderText="16 букв и цифр из письма"/>
+                        <Button Grid.Column="2" x:Name="ActivateKeyButton"
+                                Classes="primary"
+                                Content="Включить"
+                                Padding="12,4"/>
+                        <TextBlock Grid.Column="3" x:Name="LicenseStatusText"
+                                   Classes="card-text"
+                                   VerticalAlignment="Center"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
         </StackPanel>
 
-        <TabControl Grid.Row="1">
+        <TabControl Grid.Row="1" x:Name="ChannelTabs">
             <TabItem>
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -247,7 +273,7 @@
                             <Border Classes="form-card" Margin="0,8,0,0">
                                 <StackPanel Spacing="10">
                                     <TextBlock Classes="card-text"
-                                               Text="Заполните этот блок, если письма должны уходить через отдельный SMTP-ящик вместо встроенного сервисного. Для Gmail, Яндекс и Mail.ru часто нужен пароль приложения, а не обычный пароль от ящика."/>
+                                               Text="Заполните этот блок, если письма должны уходить через отдельный ящик вместо встроенного сервисного. Достаточно адреса и пароля: сервер и порт подставятся сами. Для Gmail, Яндекс и Mail.ru нужен пароль приложения, а не обычный пароль от ящика."/>
                                     <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="10">
                                         <TextBlock Grid.Row="0" Grid.Column="0" Classes="field-label" Text="Режим:"/>
                                         <CheckBox Grid.Row="0" Grid.Column="1" x:Name="UseOwnSmtpBox"
@@ -263,7 +289,7 @@
 
                                         <TextBlock Grid.Row="3" Grid.Column="0" Classes="field-label" Text="Сервер:"/>
                                         <TextBox Grid.Row="3" Grid.Column="1" x:Name="EmailSmtpHostBox"
-                                                 PlaceholderText="авто: smtp.example.com"/>
+                                                 PlaceholderText="авто по адресу отправителя"/>
 
                                         <TextBlock Grid.Row="4" Grid.Column="0" Classes="field-label" Text="Порт:"/>
                                         <TextBox Grid.Row="4" Grid.Column="1" x:Name="EmailSmtpPortBox"
@@ -458,7 +484,7 @@
 
                                         <TextBlock Grid.Row="3" Grid.Column="0" Classes="field-label" Text="Страница APK:"/>
                                         <TextBox Grid.Row="3" Grid.Column="1" x:Name="PushAppDownloadUrlBox"
-                                                 PlaceholderText="https://github.com/Geofundament/LsMonitoring/releases/latest/download/ls-alerts-latest.apk"/>
+                                                 PlaceholderText="https://github.com/Geofundament/GfReleases/releases/download/ls-alerts/ls-alerts-latest.apk"/>
 
                                         <TextBlock Grid.Row="4" Grid.Column="0" Classes="field-label" Text="Приоритет:"/>
                                         <TextBox Grid.Row="4" Grid.Column="1" x:Name="PushPriorityBox"
@@ -475,7 +501,8 @@
                 </ScrollViewer>
             </TabItem>
 
-            <TabItem>
+            <!-- SMS hidden while the SIM/provider issues are unresolved; MainWindow.ReconfigureSmsAlerts is off too. -->
+            <TabItem IsVisible="False">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <CheckBox x:Name="EnableSmsBox"/>

@@ -89,10 +89,20 @@ from the .exe by operators — mitigated by using dedicated alert-only accounts 
   **relay mode was removed from the client** (`RelayUrl`/`RelayToken`/`InstallationId`/`UsesRelay`/
   `HasRelaySettings` gone; `SendRelayEmailAsync` gone). New `IEmailSender`/`SmtpEmailSender` seam +
   `EmailConfig.ResolveTransport()`. "Свой SMTP" UI renamed → "Альтернативный SMTP" (`DeliveryMode`
-  `service`|`smtp`, legacy `relay` normalised to `service`). The **`LsMonitoring.AlertRelay` project is
-  intentionally KEPT** (unused by client now) with its M4 hardening.
+  `service`|`smtp`, legacy `relay` normalised to `service`). The `LsMonitoring.AlertRelay` project was kept
+  for a while, then deleted in 0.9 (unused; history in git and FIX_PLAN M4).
 - Both `*.Local.cs` are gitignored; `AppConfig.Load` scrubs stale `bot_token*`/`relay_token*` keys from
   disk on first load. Build 0/0; tests 38 passed / 5 skipped.
+- **0.9 distribution** (owner decision 01.11.2026): LS goes out like Osadka/Nivtropy — personal link from
+  gf-dist, `GfLicense("ls", "LsMonitoring", …)` (copy of `GfDistribution/client/GfLicense.cs`, never edit here),
+  Inno installer in `Geofundament/GfReleases`, tag `ls-v*` → `release.yml` → `GfDistribution/release.ps1 -App ls` →
+  `tools/publish.ps1`. Velopack removed; `LegacyInstall` uninstalls the old Velopack copy on first Release run.
+  Without a key: monitoring only — no alerts, no Gotify/tunnel/bot (Debug builds count as licensed). Gotify/tunnel
+  start only with Push enabled; helpers sit in a kill-on-close job (`ChildProcessJob`). SMS hidden and off.
+  APK: fixed release `GfReleases/ls-alerts`. Repo goes private after the first GfReleases release.
+  Known gap: the shared bot is polled (getUpdates) from every PC → `/start` binding races between installations.
+  Deferred by the owner (01.11): one gateway and one user for now. Planned fix when that changes: webhook +
+  sending through gf-dist (token only in Worker secrets, no TelegramBot companion in the build).
 
 ## Key drift between the plan and current code
 

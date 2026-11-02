@@ -32,7 +32,7 @@ public sealed class SmsAlertService : IAlertChannel
 
     public Task<bool> SendTestMessageAsync()
     {
-        return SendSmsAsync("LS Monitoring: тест SMS. Если сообщение пришло, SMS-канал настроен.");
+        return SendSmsAsync("ГФ 402: тест SMS. Если сообщение пришло, SMS-канал настроен.");
     }
 
     public Task<bool> SendTestAsync()
@@ -271,13 +271,13 @@ public sealed class SmsAlertService : IAlertChannel
 
     private static string FormatAlarmMessage(int nodeId, string axis, double value, DateTime startTime)
     {
-        return $"LS Monitoring: тревога. Узел {nodeId}, ось {axis}, отклонение {value:F3}°, начало {startTime:dd.MM HH:mm:ss}.";
+        return $"ГФ 402: тревога. Узел {nodeId}, ось {axis}, отклонение {value:F3}°, начало {startTime:dd.MM HH:mm:ss}.";
     }
 
     private static string FormatResolvedMessage(int nodeId, string axis, DateTime startTime, DateTime resolveTime)
     {
         var duration = resolveTime - startTime;
-        return $"LS Monitoring: норма. Узел {nodeId}, ось {axis}, длительность {duration:hh\\:mm\\:ss}.";
+        return $"ГФ 402: норма. Узел {nodeId}, ось {axis}, длительность {duration:hh\\:mm\\:ss}.";
     }
 
     private void RecordError(string message)

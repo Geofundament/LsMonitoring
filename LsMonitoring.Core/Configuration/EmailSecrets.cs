@@ -12,7 +12,12 @@ public sealed record EmailTransport(
     bool UseSsl,
     string From,
     string Username,
-    string Password);
+    string Password)
+{
+    // System.Net.Mail.SmtpClient speaks only STARTTLS. Port 465 (implicit TLS, the one mail.ru/Yandex help
+    // pages often show) just times out with it, while the same providers accept STARTTLS on 587.
+    public static int UsablePort(int port) => port is > 0 and not 465 ? port : 587;
+}
 
 /// <summary>
 /// Service-email credentials embedded into release builds. The whole transport (host/port/ssl/from/
@@ -57,10 +62,9 @@ public static partial class EmailSecrets
                 return null;
             }
 
-            // Normalise: username falls back to From, port to 587.
+            // Normalise: username falls back to From, port to a STARTTLS one.
             var username = string.IsNullOrWhiteSpace(transport.Username) ? transport.From : transport.Username;
-            var port = transport.Port > 0 ? transport.Port : 587;
-            return transport with { Username = username, Port = port };
+            return transport with { Username = username, Port = EmailTransport.UsablePort(transport.Port) };
         }
         catch
         {

@@ -1,6 +1,5 @@
 using Avalonia;
 using System;
-using Velopack;
 
 namespace LsMonitoring.Avalonia;
 
@@ -12,10 +11,6 @@ sealed class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        // Must be the very first call — Velopack needs to intercept update hooks
-        // before Avalonia or any other subsystem initialises.
-        VelopackApp.Build().Run();
-
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
 

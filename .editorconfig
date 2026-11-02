@@ -47,3 +47,8 @@ dotnet_diagnostic.CA1001.severity = none
 # CA1805: Do not initialize unnecessarily — style preference; explicit defaults
 # improve readability for mutable fields.
 dotnet_diagnostic.CA1805.severity = none
+
+# GfLicense.cs is a verbatim copy of GfDistribution/client/GfLicense.cs (kept byte-identical by its
+# scripts/sync-client.ps1). Its MachineGuid registry read is Windows-only by design; LS ships for win-x64 only.
+[**/GfLicense.cs]
+dotnet_diagnostic.CA1416.severity = none

@@ -169,7 +169,7 @@ public class TelegramAlertService : IUpdatableAlertChannel, IAsyncDisposable
         bool allSuccess = true;
         foreach (var chatId in chatIds)
         {
-            var msgId = await SendMessageAsync(chatId, "🛠 Тестовое сообщение от LS Monitoring!");
+            var msgId = await SendMessageAsync(chatId, "🛠 Тестовое сообщение от ГФ 402!");
             if (msgId == null)
                 allSuccess = false;
         }
@@ -281,13 +281,13 @@ public class TelegramAlertService : IUpdatableAlertChannel, IAsyncDisposable
     private static string FormatMessage(int nodeId, string axis, double value, DateTime startTime, DateTime currentTime)
     {
         var duration = currentTime - startTime;
-        return $"🔔 LS Monitoring\nУзел {nodeId}, ось {axis}: отклонение вышло за заданный максимум.\nОтклонение: {value:F3}°\nНачало: {startTime:HH:mm:ss}\nДлительность: {duration.ToString(@"hh\:mm\:ss")}";
+        return $"🔔 ГФ 402\nУзел {nodeId}, ось {axis}: отклонение вышло за заданный максимум.\nОтклонение: {value:F3}°\nНачало: {startTime:HH:mm:ss}\nДлительность: {duration.ToString(@"hh\:mm\:ss")}";
     }
 
     private static string FormatResolvedMessage(int nodeId, string axis, DateTime startTime, DateTime resolveTime)
     {
         var duration = resolveTime - startTime;
-        return $"✅ LS Monitoring\nУзел {nodeId}, ось {axis}: значение вернулось в норму.\nНачало события: {startTime:HH:mm:ss}\nЗавершено: {resolveTime:HH:mm:ss}\nДлительность: {duration.ToString(@"hh\:mm\:ss")}";
+        return $"✅ ГФ 402\nУзел {nodeId}, ось {axis}: значение вернулось в норму.\nНачало события: {startTime:HH:mm:ss}\nЗавершено: {resolveTime:HH:mm:ss}\nДлительность: {duration.ToString(@"hh\:mm\:ss")}";
     }
 
     private async Task<int?> SendMessageAsync(long chatId, string text)
@@ -372,7 +372,7 @@ public class TelegramAlertService : IUpdatableAlertChannel, IAsyncDisposable
         {
             if (IsStartCommand(text))
             {
-                _ = SendMessageAsync(chatId, "Код привязки не совпал. Откройте ссылку или QR из LS Monitoring и отправьте /start с кодом.");
+                _ = SendMessageAsync(chatId, "Код привязки не совпал. Откройте ссылку или QR из ГФ 402 и отправьте /start с кодом.");
             }
 
             return;
@@ -380,12 +380,12 @@ public class TelegramAlertService : IUpdatableAlertChannel, IAsyncDisposable
 
         if (linkCodeMatches && TryAddChatId(chatId))
         {
-            _ = SendMessageAsync(chatId, "👋 Вы успешно подписаны на уведомления LS Monitoring!");
+            _ = SendMessageAsync(chatId, "👋 Вы успешно подписаны на уведомления ГФ 402!");
             _onNewChatIdDiscovered?.Invoke(chatId);
         }
         else if (linkCodeMatches)
         {
-            _ = SendMessageAsync(chatId, "✅ Вы уже подписаны на уведомления. Ожидайте тревожных сигналов от LS Monitoring!");
+            _ = SendMessageAsync(chatId, "✅ Вы уже подписаны на уведомления. Ожидайте тревожных сигналов от ГФ 402!");
         }
     }
 

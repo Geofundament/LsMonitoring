@@ -8,6 +8,7 @@
         Width="1280" Height="800"
         MinWidth="1180" MinHeight="620"
         Title="ГФ 402 — Мониторинг наклона"
+        Icon="avares://LsMonitoring.Avalonia/app.ico"
         Background="{StaticResource BrushAppBackground}"
         WindowState="Maximized">
 
@@ -37,12 +38,12 @@
                     <Border Width="34" Height="34" CornerRadius="8"
                             Background="{StaticResource BrushAccentTint}"
                             BorderBrush="#BAE6FD" BorderThickness="1">
-                        <TextBlock Text="LS" FontSize="12" FontWeight="Bold"
+                        <TextBlock Text="ГФ" FontSize="12" FontWeight="Bold"
                                    Foreground="{StaticResource BrushAccentA}"
                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <StackPanel Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="ГФ 402" FontSize="15" FontWeight="SemiBold"
+                        <TextBlock Text="ГФ 402 — Мониторинг наклона" FontSize="15" FontWeight="SemiBold"
                                    Foreground="{StaticResource BrushText}"/>
                     </StackPanel>
                 </Grid>
@@ -91,17 +92,31 @@
             </Grid>
         </Border>
 
-        <Border x:Name="UpdateBanner" Grid.Row="2" IsVisible="False"
-                Background="#166534" Padding="16,6">
-            <Grid ColumnDefinitions="*,Auto">
-                <TextBlock x:Name="UpdateBannerText" Grid.Column="0"
-                           Text="Доступно обновление" FontSize="12"
-                           Foreground="White" VerticalAlignment="Center"/>
-                <Button x:Name="UpdateBannerButton" Grid.Column="1"
-                        Content="Перезапустить и обновить"
-                        Classes="link" Foreground="White" FontSize="12"/>
-            </Grid>
-        </Border>
+        <StackPanel Grid.Row="2">
+            <Border x:Name="LicenseBanner" IsVisible="False"
+                    Background="{StaticResource BrushWarningTint}" Padding="16,6">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0"
+                               Text="Без ключа: мониторинг работает, оповещения выключены."
+                               FontSize="12" Foreground="{StaticResource BrushWarning}"
+                               VerticalAlignment="Center"/>
+                    <Button x:Name="LicenseBannerButton" Grid.Column="1"
+                            Content="Ввести ключ"
+                            Classes="link" FontSize="12"/>
+                </Grid>
+            </Border>
+            <Border x:Name="UpdateBanner" IsVisible="False"
+                    Background="#166534" Padding="16,6">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock x:Name="UpdateBannerText" Grid.Column="0"
+                               Text="Доступно обновление" FontSize="12"
+                               Foreground="White" VerticalAlignment="Center"/>
+                    <Button x:Name="UpdateBannerButton" Grid.Column="1"
+                            Content="Установить"
+                            Classes="link" Foreground="White" FontSize="12"/>
+                </Grid>
+            </Border>
+        </StackPanel>
 
         <Grid Grid.Row="3" ColumnDefinitions="252,*">
 

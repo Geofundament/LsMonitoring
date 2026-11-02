@@ -1,0 +1,182 @@
+name: Release
+
+# Tag ls-v<version> (the same as <Version> in LsMonitoring.Avalonia.csproj) releases LS Monitoring the same way as
+# the other Geofundament programs: GfDistribution/release.ps1 builds the installer, publishes it to the public
+# Geofundament/GfReleases and makes it current in the distribution service. The Android APK goes next to it and to
+# the fixed GfReleases release "ls-alerts", which gives the desktop app a permanent download link for its QR code.
+#
+# Secrets (organization): GF_GITHUB_TOKEN (read GfDistribution, write Contents of GfReleases), GF_ADMIN_TOKEN,
+# LS_TELEGRAM_BOT_TOKEN, LS_SMTP_HOST/PORT/SSL/FROM/USER/PASSWORD, LS_ALERTS_KEYSTORE_B64/_PASSWORD, LS_ALERTS_KEY_ALIAS/_PASSWORD.
+on:
+  push:
+    tags:
+      - 'ls-v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Java for Android
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+          validate-wrappers: false
+
+      - name: Build Android alerts APK
+        shell: bash
+        env:
+          LS_ALERTS_KEYSTORE_B64: ${{ secrets.LS_ALERTS_KEYSTORE_B64 }}
+          LS_ALERTS_KEYSTORE_PASSWORD: ${{ secrets.LS_ALERTS_KEYSTORE_PASSWORD }}
+          LS_ALERTS_KEY_ALIAS: ${{ secrets.LS_ALERTS_KEY_ALIAS }}
+          LS_ALERTS_KEY_PASSWORD: ${{ secrets.LS_ALERTS_KEY_PASSWORD }}
+        run: |
+          missing=()
+          for name in LS_ALERTS_KEYSTORE_B64 LS_ALERTS_KEYSTORE_PASSWORD LS_ALERTS_KEY_ALIAS LS_ALERTS_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              missing+=("$name")
+            fi
+          done
+
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "Missing Android signing secrets: ${missing[*]}"
+            exit 1
+          fi
+
+          VERSION="${GITHUB_REF_NAME#ls-v}"
+          IFS='.' read -r -a parts <<< "$VERSION"
+          v1=${parts[0]:-0}
+          v2=${parts[1]:-0}
+          v3=${parts[2]:-0}
+          VERSION_CODE=$(( v1 * 10000 + v2 * 100 + v3 ))
+
+          KEYSTORE_PATH="${{ github.workspace }}/LsMonitoring.MobileAlerts/release-key.jks"
+          printf "%s" "$LS_ALERTS_KEYSTORE_B64" | base64 --decode > "$KEYSTORE_PATH"
+          export LS_ALERTS_KEYSTORE_FILE="$KEYSTORE_PATH"
+
+          cd LsMonitoring.MobileAlerts
+          gradle --no-daemon assembleRelease -PversionName="$VERSION" -PversionCode="$VERSION_CODE"
+          cd ..
+
+          mkdir -p apk
+          cp LsMonitoring.MobileAlerts/app/build/outputs/apk/release/app-release.apk apk/ls-alerts-$VERSION.apk
+          cp LsMonitoring.MobileAlerts/app/build/outputs/apk/release/app-release.apk apk/ls-alerts-latest.apk
+
+          APKSIGNER_PATH=$(find $ANDROID_HOME/build-tools -name apksigner | sort -V | tail -n 1)
+          if [ -n "$APKSIGNER_PATH" ]; then
+            $APKSIGNER_PATH verify --print-certs apk/ls-alerts-$VERSION.apk
+          else
+            echo "apksigner not found, skipping signature verification"
+          fi
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: apk/*.apk
+
+  desktop:
+    needs: android
+    runs-on: windows-latest
+
+    steps:
+      # release.ps1 expects the program next to GfDistribution, as on the owner's machine.
+      - name: Checkout LsMonitoring
+        uses: actions/checkout@v6
+        with:
+          path: LsMonitoring
+
+      - name: Checkout GfDistribution
+        uses: actions/checkout@v6
+        with:
+          repository: Geofundament/GfDistribution
+          token: ${{ secrets.GF_GITHUB_TOKEN }}
+          path: GfDistribution
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: LsMonitoring/global.json
+
+      - name: Check tag, version and license client
+        id: version
+        shell: pwsh
+        run: |
+          $project = 'LsMonitoring/LsMonitoring.Avalonia/LsMonitoring.Avalonia.csproj'
+          $version = ([xml](Get-Content $project -Raw)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          if ($env:GITHUB_REF_NAME -ne "ls-v$version") { throw "Tag $env:GITHUB_REF_NAME does not match <Version>$version</Version>." }
+          if ((Get-FileHash LsMonitoring/LsMonitoring.Avalonia/GfLicense.cs).Hash -ne (Get-FileHash GfDistribution/client/GfLicense.cs).Hash) {
+            throw 'GfLicense.cs differs from GfDistribution/client: run GfDistribution/scripts/sync-client.ps1.'
+          }
+          "value=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Inno Setup
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+
+      - name: Build, publish and register the installer
+        shell: pwsh
+        env:
+          CI: 'true'
+          GH_TOKEN: ${{ secrets.GF_GITHUB_TOKEN }}
+          GF_ADMIN_TOKEN: ${{ secrets.GF_ADMIN_TOKEN }}
+          LS_TELEGRAM_BOT_TOKEN: ${{ secrets.LS_TELEGRAM_BOT_TOKEN }}
+          LS_SMTP_HOST: ${{ secrets.LS_SMTP_HOST }}
+          LS_SMTP_PORT: ${{ secrets.LS_SMTP_PORT }}
+          LS_SMTP_SSL: ${{ secrets.LS_SMTP_SSL }}
+          LS_SMTP_FROM: ${{ secrets.LS_SMTP_FROM }}
+          LS_SMTP_USER: ${{ secrets.LS_SMTP_USER }}
+          LS_SMTP_PASSWORD: ${{ secrets.LS_SMTP_PASSWORD }}
+        run: |
+          $notes = git -C LsMonitoring tag -l --format='%(contents:subject)' $env:GITHUB_REF_NAME
+          ./GfDistribution/release.ps1 -App ls -Notes "$notes"
+
+      - name: Download APK
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+          path: apk
+
+      - name: Publish APK
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GF_GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          $repo = 'Geofundament/GfReleases'
+          gh release upload "ls-v$env:VERSION" "apk/ls-alerts-$env:VERSION.apk" --repo $repo
+          if ($LASTEXITCODE -ne 0) { throw 'APK upload to the LS release failed.' }
+          gh release view ls-alerts --repo $repo *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create ls-alerts --repo $repo --latest=false --title "LS Alerts $env:VERSION" `
+              --notes 'Android-приложение LS Alerts. Постоянная ссылка на последнюю версию — ls-alerts-latest.apk.'
+            if ($LASTEXITCODE -ne 0) { throw 'Could not create the ls-alerts release.' }
+          }
+          gh release upload ls-alerts apk/ls-alerts-latest.apk --repo $repo --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'APK upload to ls-alerts failed.' }
+          # The phone app reads its latest version from this title.
+          gh release edit ls-alerts --repo $repo --title "LS Alerts $env:VERSION"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not retitle ls-alerts.' }

@@ -33,6 +33,17 @@ public class EmailConfigTests
         Assert.Equal("monitor@example.org", transport!.Username);
     }
 
+    [Theory]
+    [InlineData(465, 587)]
+    [InlineData(0, 587)]
+    [InlineData(2525, 2525)]
+    public void ResolveTransport_OwnSmtp_UsesStartTlsPort(int configured, int expected)
+    {
+        var config = new EmailConfig { DeliveryMode = EmailDeliveryMode.Smtp, From = "monitor@mail.ru", SmtpPort = configured };
+
+        Assert.Equal(expected, config.ResolveTransport()!.Port);
+    }
+
     [Fact]
     public void UsesService_ByDefault()
     {
@@ -92,7 +103,7 @@ public class EmailConfigTests
 
             Assert.NotNull(resolved);
             Assert.Equal("smtp.example.org", resolved!.Host);
-            Assert.Equal(465, resolved.Port);
+            Assert.Equal(587, resolved.Port); // 465 (implicit TLS) is not supported by SmtpClient
             Assert.Equal("svc@example.org", resolved.From);
             Assert.Equal("svc@example.org", resolved.Username); // falls back to From
         });

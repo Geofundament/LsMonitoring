@@ -316,8 +316,7 @@ public sealed class EmailConfig
         }
 
         var username = !string.IsNullOrWhiteSpace(Username) ? Username.Trim() : from;
-        var port = SmtpPort > 0 ? SmtpPort : 587;
-        return new EmailTransport(host, port, UseSsl, from, username, Password);
+        return new EmailTransport(host, EmailTransport.UsablePort(SmtpPort), UseSsl, from, username, Password);
     }
 
     [JsonIgnore]
@@ -431,7 +430,8 @@ public sealed class SmsConfig
 
 public sealed class PushConfig
 {
-    public const string DefaultAppDownloadUrl = "https://github.com/Geofundament/LsMonitoring/releases/latest/download/ls-alerts-latest.apk";
+    // Fixed release in the public GfReleases repo; CI replaces the APK there on every LS release.
+    public const string DefaultAppDownloadUrl = "https://github.com/Geofundament/GfReleases/releases/download/ls-alerts/ls-alerts-latest.apk";
     public const string DefaultLocalServerUrl = "http://localhost:8080";
 
     [JsonPropertyName("enabled")]
@@ -491,8 +491,18 @@ public sealed class PushConfig
         set => ClientTokenBase64 = ProtectedSecret.Encode(value);
     }
 
+    // Releases moved from the now private LsMonitoring repo to GfReleases. Older versions saved the old
+    // address explicitly, so it is dropped on load and the default applies.
     [JsonPropertyName("app_download_url")]
-    public string AppDownloadUrl { get; set; } = "";
+    public string AppDownloadUrl
+    {
+        get => _appDownloadUrl;
+        set => _appDownloadUrl = value is not null && !value.Contains("/LsMonitoring/releases/", StringComparison.OrdinalIgnoreCase)
+            ? value
+            : "";
+    }
+
+    private string _appDownloadUrl = "";
 
     [JsonPropertyName("auto_start_temporary_tunnel")]
     public bool AutoStartTemporaryTunnel { get; set; } = true;
@@ -540,11 +550,13 @@ public sealed class PushConfig
     }
 
     /// <summary>
-    /// Auto-start logic intentionally does NOT require <see cref="Enabled"/>: the tunnel + local Gotify
-    /// bootstrap so the Connect QR is ready before the user toggles the channel on.
+    /// Local Gotify + tunnel start with the app only while the Push channel is on: a disabled channel must not
+    /// keep a server and an SSH session running on the operator's PC. The first setup goes through the
+    /// "Запустить tunnel" button in the dialog, which also switches the channel on.
     /// </summary>
     [JsonIgnore]
     public bool ShouldAutoStartTemporaryTunnel =>
+        Enabled &&
         AutoStartTemporaryTunnel &&
         (string.IsNullOrWhiteSpace(EffectiveServerUrl) || UsesTemporaryTunnel);
 
@@ -788,6 +800,10 @@ public sealed class AppConfig
             return basePath;
         }
 
+#if DEBUG
+        // Dev convenience: `dotnet run` picks up the repo-root config.json. Release builds skip this so an
+        // unrelated config.json somewhere above the working directory (e.g. in the user profile) is never
+        // read or overwritten.
         var current = new DirectoryInfo(Environment.CurrentDirectory);
         while (current is not null)
         {
@@ -799,6 +815,7 @@ public sealed class AppConfig
 
             current = current.Parent;
         }
+#endif
 
         var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         return string.IsNullOrWhiteSpace(localAppData)

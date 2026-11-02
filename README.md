@@ -18,7 +18,22 @@ LS Monitoring - служебное Windows-приложение для мони�
 - Глобальные нули и критические пороги A/B, а также ноль по текущему измерению для отдельного узла.
 - Расчет отклонений по абсолютным углам A/B или по вариациям dA/dB из прибора.
 - Локальная история критических отклонений: узел, ось, начало, длительность, последнее значение, пик и порог.
-- Диагностика версии, путей файлов, gateway, каналов оповещений, Gotify/tunnel и обновлений.
+- Диагностика версии, путей файлов, gateway, каналов оповещений, Gotify/tunnel, лицензии и обновлений.
+
+## Выдача и лицензия
+
+LS Monitoring (ГФ 402) выдаётся так же, как остальные программы Геофундамента: личной ссылкой из панели
+`gf-dist` (`GfDistribution/README.md`). Исходники закрыты, установщики лежат в открытом `Geofundament/GfReleases`.
+
+- Установщик ставит программу в `%LOCALAPPDATA%\Programs\Геофундамент\LsMonitoring` без прав администратора и
+  передаёт ей ключ из своего имени.
+- Без ключа программа мониторит как обычно (те же данные показывает сам шлюз), но оповещения выключены и Gotify,
+  туннель и Telegram-бот не запускаются. Ключ вводится в полосе «Без ключа… — Ввести ключ» или в окне «Оповещения».
+- Разрешение сервиса действует 14 дней без сети; программа переспрашивает сервис раз в 6 часов, так что отключение
+  в панели и новая версия доходят и до станции, которая работает неделями без перезапуска.
+- Новую версию программа предлагает полосой «Доступна версия … — Установить» и ставит её сама.
+- Копия, поставленная старым установщиком Velopack (`%LOCALAPPDATA%\LsMonitoring`, до 0.9), удаляется при первом
+  запуске новой. Настройки в `%LOCALAPPDATA%\LS Monitoring` остаются.
 
 ## Оповещения
 
@@ -29,30 +44,41 @@ LS Monitoring - служебное Windows-приложение для мони�
 - Telegram: привязка чата через QR или `/start <код>`, тестовое сообщение, обновление активной тревоги, сообщение о закрытии.
 - Email: встроенная сервисная почта в релизной сборке или альтернативный SMTP; тестовое письмо; старт тревоги; опционально письмо о закрытии.
 - Push: Gotify, локальный Gotify на компьютере, временный tunnel через `localhost.run`, QR для Android-приложения LS Alerts; активные push-уведомления обновляются и закрываются.
-- SMS: `sms.ru`, тестовая SMS, старт тревоги, опционально SMS о закрытии, лимит сообщений в час.
 
-Webhook в интерфейсе помечен как канал в разработке. Отправка webhook-событий в текущей версии не реализована.
+SMS (`sms.ru`) временно скрыт и не отправляется: код канала на месте, включается вместе с вкладкой
+(`MessagesDialog.axaml`, `MainWindow.ReconfigureSmsAlerts`). Webhook в интерфейсе помечен как канал в разработке.
+
+Для альтернативного SMTP достаточно адреса и пароля приложения: сервер подставляется по домену, порт — 587
+(STARTTLS). Порт 465 заменяется на 587: `System.Net.Mail` не умеет неявный TLS.
 
 ## Push и LS Alerts
 
 Push-канал использует Gotify. Приложение может запустить локальный `gotify-server.exe`, создать временный публичный URL через `localhost.run` и сгенерировать QR-коды для скачивания и подключения Android-приложения LS Alerts.
 
-Для временного tunnel нужен OpenSSH Client (`ssh.exe`). URL вида `https://*.lhr.life` действует только пока работает tunnel; после перезагрузки компьютера или остановки tunnel адрес создается заново.
+Для временного tunnel нужен OpenSSH Client (`ssh.exe`). URL вида `https://*.lhr.life` действует только пока работает tunnel; после перезапуска программы или компьютера адрес создается заново, и телефон нужно подключить заново по QR.
+
+Gotify и tunnel запускаются только при включённом канале Push и только пока открыта программа. Вспомогательные
+процессы (gotify-server, ssh, Telegram-бот) входят в job object Windows: система закрывает их вместе с программой,
+даже если её сняли через диспетчер задач. APK лежит по постоянной ссылке
+`https://github.com/Geofundament/GfReleases/releases/download/ls-alerts/ls-alerts-latest.apk`.
 
 ## Файлы и секреты
 
-- Конфигурация хранится в `config.json`; если рядом с приложением или рабочей директорией файла нет, используется `%LOCALAPPDATA%\LS Monitoring\config.json`.
+- Конфигурация хранится в `%LOCALAPPDATA%\LS Monitoring\config.json`; `config.json` рядом с программой (portable) имеет приоритет. Debug-сборка ищет `config.json` и вверх от рабочей папки — для `dotnet run` из репозитория.
 - История отклонений хранится в `%LOCALAPPDATA%\LS Monitoring\deviation-history.json`.
 - Диагностические логи каналов оповещений пишутся в `%LOCALAPPDATA%\LS Monitoring\logs`.
 - Пароли и токены в `*_b64` защищаются через DPAPI на Windows. Вне Windows это обычный base64 без системного хранилища секретов.
-- Telegram bot token и креды встроенной сервисной почты не пишутся в `config.json`; в релизную сборку они попадают из GitHub Secrets.
+- Telegram bot token и креды встроенной сервисной почты не пишутся в `config.json`; в релизную сборку они попадают из GitHub Secrets (`tools/publish.ps1`). Их можно достать из скачанной программы: держите для них отдельные служебные учётки и меняйте при утечке.
 - Runtime-файлы (`config.json`, `data/`, `logs/`, `dist/`, `.dotnet-cli-home/`, артефакты сборки) не предназначены для Git.
 
 ## Ограничения текущей версии
 
 - Источник данных - CSV gateway; Modbus не реализован.
 - Webhook-события не отправляются.
-- Автообновление через Velopack работает только для установленной desktop-сборки, не для portable/dev-запуска.
+- Общий Telegram-бот опрашивается (getUpdates) с каждого компьютера, где включён Telegram. Когда таких компьютеров
+  несколько, они перехватывают друг у друга `/start` и привязка чата срабатывает через раз; рассылка тревог при этом
+  работает. Лечится приёмом `/start` в одном месте (webhook на сервисе выдачи).
+- Debug-сборка всегда считается лицензированной — чтобы проверять оповещения при разработке.
 - CSV-просмотр нужен для проверки и разбора данных; он не должен создавать реальные тревоги.
 
 ## Разработка
@@ -62,7 +88,7 @@ Push-канал использует Gotify. Приложение может з�
 - .NET SDK 9.0;
 - Windows 10/11 для основной desktop-сборки;
 - Java 17 и Android SDK для сборки `LsMonitoring.MobileAlerts`;
-- Inno Setup, если нужен локальный installer.
+- Inno Setup 6 и рядом лежащий `GfDistribution` — для выпуска вручную.
 
 Команды из корня репозитория:
 
@@ -73,17 +99,20 @@ dotnet test .\LsMonitoring.sln
 dotnet run --project .\LsMonitoring.Avalonia\LsMonitoring.Avalonia.csproj
 ```
 
-Релизный workflow запускается по тегам `v*`. Он собирает desktop-приложение, Telegram companion, Gotify, portable zip, Velopack-пакеты и Android APK `ls-alerts`.
+Выпуск: увеличьте `<Version>` в `LsMonitoring.Avalonia/LsMonitoring.Avalonia.csproj`, закоммитьте и поставьте тег
+`ls-v<версия>` (в сообщении тега — что изменилось). `release.yml` собирает APK, затем вызывает
+`GfDistribution/release.ps1 -App ls`: тесты, сборка (`tools/publish.ps1`: программа, Telegram-бот, gotify-server
+с проверкой SHA-256), установщик Inno Setup, выпуск в `GfReleases`, «текущая» в сервисе. APK кладётся рядом и в
+постоянный выпуск `ls-alerts`. Запасной путь с машины владельца: `pwsh ..\GfDistribution\release.ps1 -App ls`.
 
 ## Структура
 
 ```text
-LsMonitoring.Core/          # gateway CSV, парсер, буферы, пороги, оповещения, обновления
-LsMonitoring.Avalonia/      # desktop UI на Avalonia
+LsMonitoring.Core/          # gateway CSV, парсер, буферы, пороги, оповещения, локальные Gotify/tunnel
+LsMonitoring.Avalonia/      # desktop UI на Avalonia; GfLicense.cs — копия из GfDistribution/client
 LsMonitoring.Core.Tests/    # unit-тесты ядра
 LsMonitoring.TelegramBot/   # локальный companion для Telegram getUpdates
 LsMonitoring.MobileAlerts/  # Android-приложение LS Alerts для push
-LsMonitoring.AlertRelay/    # legacy HTTP relay для почты
-build/installer/            # Inno Setup installer script
-.github/workflows/          # CI и release workflow
+tools/publish.ps1           # сборка для установщика, вызывается из GfDistribution/release.ps1
+.github/workflows/          # dotnet.yml — CI, release.yml — выпуск по тегу ls-v*
 ```

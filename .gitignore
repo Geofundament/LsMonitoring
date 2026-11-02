@@ -7,9 +7,7 @@ logs/
 *.log
 
 # Local build output
-build/*
-!build/installer/
-!build/installer/**
+build/
 dist/
 
 # .NET / Avalonia

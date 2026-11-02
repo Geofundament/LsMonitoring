@@ -21,17 +21,28 @@ public sealed class EmailAlertService : IAlertChannel
     public string? LastError { get; private set; }
     public string ChannelName => "Email";
 
-    public EmailAlertService(EmailConfig config, IEmailSender? sender = null)
+    /// <param name="previous">
+    /// The instance this one replaces after a settings change: its open alarms carry over, so the "норма" email
+    /// still goes out for an alarm that started before the change.
+    /// </param>
+    public EmailAlertService(EmailConfig config, IEmailSender? sender = null, EmailAlertService? previous = null)
     {
         _config = config;
         _sender = sender ?? new SmtpEmailSender();
+        if (previous is not null)
+        {
+            foreach (var (key, alarm) in previous._activeAlarms)
+            {
+                _activeAlarms[key] = alarm;
+            }
+        }
     }
 
     public async Task<bool> SendTestMessageAsync()
     {
         return await SendEmailAsync(
-            "LS Monitoring: тестовое письмо",
-            "Тестовое письмо от LS Monitoring.\n\nЕсли вы видите это сообщение, почтовые уведомления настроены.");
+            "ГФ 402: тестовое письмо",
+            "Тестовое письмо от ГФ 402.\n\nЕсли вы видите это сообщение, почтовые уведомления настроены.");
     }
 
     public Task<bool> SendTestAsync()
@@ -75,7 +86,7 @@ public sealed class EmailAlertService : IAlertChannel
                 }
 
                 var sent = await SendEmailAsync(
-                    $"LS Monitoring: тревога, узел {nodeId}, ось {axis}",
+                    $"ГФ 402: тревога, узел {nodeId}, ось {axis}",
                     FormatAlarmMessage(nodeId, axis, value, timestamp));
 
                 if (sent)
@@ -99,7 +110,7 @@ public sealed class EmailAlertService : IAlertChannel
                 }
 
                 var sent = await SendEmailAsync(
-                    $"LS Monitoring: норма, узел {nodeId}, ось {axis}",
+                    $"ГФ 402: норма, узел {nodeId}, ось {axis}",
                     FormatResolvedMessage(nodeId, axis, alarm.StartTime, timestamp));
 
                 if (sent)
@@ -153,7 +164,7 @@ public sealed class EmailAlertService : IAlertChannel
     private static string FormatAlarmMessage(int nodeId, string axis, double value, DateTime startTime)
     {
         return
-            "LS Monitoring\n\n" +
+            "ГФ 402\n\n" +
             $"Узел: {nodeId}\n" +
             $"Ось: {axis}\n" +
             "Статус: критическое отклонение\n" +
@@ -165,7 +176,7 @@ public sealed class EmailAlertService : IAlertChannel
     {
         var duration = resolveTime - startTime;
         return
-            "LS Monitoring\n\n" +
+            "ГФ 402\n\n" +
             $"Узел: {nodeId}\n" +
             $"Ось: {axis}\n" +
             "Статус: значение вернулось в норму\n" +

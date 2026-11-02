@@ -40,7 +40,7 @@ public sealed class SmtpEmailSender : IEmailSender
         {
             using var message = new MailMessage
             {
-                From = new MailAddress(transport.From, "LS Monitoring", Encoding.UTF8),
+                From = new MailAddress(transport.From, "ГФ 402", Encoding.UTF8),
                 Subject = subject,
                 SubjectEncoding = Encoding.UTF8,
                 Body = body,

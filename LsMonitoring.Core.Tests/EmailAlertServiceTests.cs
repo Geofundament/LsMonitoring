@@ -36,6 +36,22 @@ public sealed class EmailAlertServiceTests
     }
 
     [Fact]
+    public async Task Replacement_KeepsOpenAlarmsSoResolvedEmailIsSent()
+    {
+        var sender = new CapturingSender();
+        var start = new DateTime(2026, 5, 26, 10, 0, 0);
+        var before = new EmailAlertService(BuildConfig(sendResolved: true), sender);
+        await before.UpdateAlarmAsync(6989, "A", true, -12, start);
+
+        // The alerts dialog was closed during the alarm: MainWindow recreates the channel.
+        var after = new EmailAlertService(BuildConfig(sendResolved: true), sender, before);
+        await after.UpdateAlarmAsync(6989, "A", false, -1, start.AddMinutes(2));
+
+        Assert.Equal(2, sender.Sends.Count);
+        Assert.Contains("норма", sender.Sends[1].Subject, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task UpdateAlarmAsync_SerializesConcurrentAxesAndSendsBothStartedEmails()
     {
         var sender = new CapturingSender { Delay = TimeSpan.FromMilliseconds(20) };

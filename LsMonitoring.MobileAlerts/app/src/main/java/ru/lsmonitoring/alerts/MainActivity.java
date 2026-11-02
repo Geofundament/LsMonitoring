@@ -42,7 +42,8 @@ public final class MainActivity extends Activity {
     static final String PREF_LAST_MESSAGE = "last_message";
     static final String PREF_LAST_MESSAGE_AT = "last_message_at";
     private static final String CHANNEL_ALARMS = "alarms";
-    private static final String LATEST_RELEASE_URL = "https://api.github.com/repos/Geofundament/LsMonitoring/releases/latest";
+    // Fixed release in the public GfReleases repo: CI replaces ls-alerts-latest.apk there and titles it "LS Alerts <version>".
+    private static final String LATEST_RELEASE_URL = "https://api.github.com/repos/Geofundament/GfReleases/releases/tags/ls-alerts";
 
     private EditText serverUrlBox;
     private EditText clientTokenBox;
@@ -346,13 +347,14 @@ public final class MainActivity extends Activity {
     private void processReleaseResponse(String body, boolean silent) {
         try {
             JSONObject release = new JSONObject(body);
-            String latestVersion = normalizeVersion(release.optString("tag_name", ""));
+            String title = release.optString("name", "");
+            String latestVersion = normalizeVersion(title.substring(title.lastIndexOf(' ') + 1));
             String currentVersion = normalizeVersion(appVersion());
             String apkUrl = findApkAssetUrl(release.optJSONArray("assets"));
 
             if (latestVersion.isEmpty()) {
                 if (!silent) {
-                    runOnUiThread(() -> statusText.setText("В latest release нет tag_name."));
+                    runOnUiThread(() -> statusText.setText("В выпуске ls-alerts нет версии в названии."));
                 }
                 return;
             }

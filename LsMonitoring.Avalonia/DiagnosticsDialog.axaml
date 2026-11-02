@@ -90,18 +90,16 @@
                     <StackPanel Spacing="10">
                         <TextBlock Text="ОПОВЕЩЕНИЯ" Classes="section-title"/>
                         <Grid ColumnDefinitions="150,*"
-                              RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+                              RowDefinitions="Auto,Auto,Auto,Auto"
                               RowSpacing="8">
                             <TextBlock Grid.Row="0" Classes="label" Text="Telegram:"/>
                             <TextBlock Grid.Row="0" Grid.Column="1" x:Name="TelegramChannelText" Classes="value"/>
                             <TextBlock Grid.Row="1" Classes="label" Text="Почта:"/>
                             <TextBlock Grid.Row="1" Grid.Column="1" x:Name="EmailChannelText" Classes="value"/>
-                            <TextBlock Grid.Row="2" Classes="label" Text="SMS:"/>
-                            <TextBlock Grid.Row="2" Grid.Column="1" x:Name="SmsChannelText" Classes="value"/>
-                            <TextBlock Grid.Row="3" Classes="label" Text="Push:"/>
-                            <TextBlock Grid.Row="3" Grid.Column="1" x:Name="PushChannelText" Classes="value"/>
-                            <TextBlock Grid.Row="4" Classes="label" Text="Ошибки:"/>
-                            <TextBlock Grid.Row="4" Grid.Column="1" x:Name="ChannelErrorsText" Classes="value"/>
+                            <TextBlock Grid.Row="2" Classes="label" Text="Push:"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" x:Name="PushChannelText" Classes="value"/>
+                            <TextBlock Grid.Row="3" Classes="label" Text="Ошибки:"/>
+                            <TextBlock Grid.Row="3" Grid.Column="1" x:Name="ChannelErrorsText" Classes="value"/>
                         </Grid>
                     </StackPanel>
                 </Border>
@@ -124,24 +122,19 @@
 
                 <Border Classes="section-card">
                     <StackPanel Spacing="10">
-                        <TextBlock Text="ОБНОВЛЕНИЯ" Classes="section-title"/>
+                        <TextBlock Text="ЛИЦЕНЗИЯ И ОБНОВЛЕНИЯ" Classes="section-title"/>
                         <TextBlock x:Name="UpdateStatusText"
-                                   Classes="value"
-                                   Text="Проверка ещё не запускалась."/>
+                                   Classes="value"/>
                     </StackPanel>
                 </Border>
             </StackPanel>
         </ScrollViewer>
 
-        <Grid Grid.Row="2" ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="10">
+        <Grid Grid.Row="2" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
             <Button Grid.Column="1" x:Name="CheckUpdateButton"
-                    Content="Проверить обновление"
+                    Content="Проверить лицензию и обновление"
                     Padding="14,6"/>
-            <Button Grid.Column="2" x:Name="OpenReleaseButton"
-                    Content="Открыть релиз"
-                    Padding="14,6"
-                    IsEnabled="False"/>
-            <Button Grid.Column="3" x:Name="CloseButton"
+            <Button Grid.Column="2" x:Name="CloseButton"
                     Classes="primary"
                     Content="Закрыть"
                     Padding="14,6"/>

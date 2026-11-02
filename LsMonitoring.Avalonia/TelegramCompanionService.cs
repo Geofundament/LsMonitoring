@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using LsMonitoring.Core.Alarms;
+using LsMonitoring.Core.LocalServices;
 
 namespace LsMonitoring.Avalonia;
 
@@ -176,6 +177,7 @@ public sealed class TelegramCompanionService : IUpdatableAlertChannel, IAsyncDis
             return false;
         }
 
+        ChildProcessJob.Add(_process);
         DrainStreams(_process);
 
         var deadline = DateTime.UtcNow.AddSeconds(10);

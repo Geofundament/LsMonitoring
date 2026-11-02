@@ -56,6 +56,18 @@ public class PushConfigTests
     }
 
     [Fact]
+    public void AppDownloadUrl_DropsLegacyRepositoryAddress()
+    {
+        var config = new PushConfig
+        {
+            AppDownloadUrl = "https://github.com/Gorjian1/LsMonitoring/releases/latest/download/ls-alerts-latest.apk"
+        };
+
+        Assert.Equal("", config.AppDownloadUrl);
+        Assert.Equal(PushConfig.DefaultAppDownloadUrl, config.EffectiveAppDownloadUrl);
+    }
+
+    [Fact]
     public void EffectiveLocalServerUrl_UsesGotifyLocalhostByDefault()
     {
         var config = new PushConfig();
@@ -81,6 +93,14 @@ public class PushConfigTests
         Assert.True(emptyConfig.ShouldAutoStartTemporaryTunnel);
         Assert.True(localhostRunConfig.ShouldAutoStartTemporaryTunnel);
         Assert.True(legacyCloudflareConfig.ShouldAutoStartTemporaryTunnel);
+    }
+
+    [Fact]
+    public void ShouldAutoStartTemporaryTunnel_RequiresEnabledChannel()
+    {
+        var config = new PushConfig { Enabled = false, ServerUrl = "" };
+
+        Assert.False(config.ShouldAutoStartTemporaryTunnel);
     }
 
     [Fact]
